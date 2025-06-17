@@ -21,8 +21,9 @@ async function run(): Promise<void> {
     getBooleanInput('review_comment_lgtm'),
     getMultilineInput('path_filters'),
     getInput('system_message'),
-    getInput('openai_light_model'),
-    getInput('openai_heavy_model'),
+    getInput('ai_provider'),
+    getInput('light_model'),
+    getInput('heavy_model'),
     getInput('openai_model_temperature'),
     getInput('openai_retries'),
     getInput('openai_timeout_ms'),
@@ -46,7 +47,7 @@ async function run(): Promise<void> {
   try {
     lightBot = new Bot(
       options,
-      new OpenAIOptions(options.openaiLightModel, options.lightTokenLimits)
+      new OpenAIOptions(options.lightModel, options.lightTokenLimits)
     )
   } catch (e: any) {
     warning(
@@ -59,7 +60,7 @@ async function run(): Promise<void> {
   try {
     heavyBot = new Bot(
       options,
-      new OpenAIOptions(options.openaiHeavyModel, options.heavyTokenLimits)
+      new OpenAIOptions(options.heavyModel, options.heavyTokenLimits)
     )
   } catch (e: any) {
     warning(
