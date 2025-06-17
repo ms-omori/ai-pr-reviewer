@@ -11,8 +11,9 @@ export class Options {
   reviewCommentLGTM: boolean
   pathFilters: PathFilter
   systemMessage: string
-  openaiLightModel: string
-  openaiHeavyModel: string
+  aiProvider: string
+  lightModel: string
+  heavyModel: string
   openaiModelTemperature: number
   openaiRetries: number
   openaiTimeoutMS: number
@@ -32,8 +33,9 @@ export class Options {
     reviewCommentLGTM = false,
     pathFilters: string[] | null = null,
     systemMessage = '',
-    openaiLightModel = 'gpt-3.5-turbo',
-    openaiHeavyModel = 'gpt-3.5-turbo',
+    aiProvider = 'claude',
+    lightModel = 'claude-3-5-haiku-20241022',
+    heavyModel = 'claude-3-5-sonnet-20241022',
     openaiModelTemperature = '0.0',
     openaiRetries = '3',
     openaiTimeoutMS = '120000',
@@ -50,15 +52,17 @@ export class Options {
     this.reviewCommentLGTM = reviewCommentLGTM
     this.pathFilters = new PathFilter(pathFilters)
     this.systemMessage = systemMessage
-    this.openaiLightModel = openaiLightModel
-    this.openaiHeavyModel = openaiHeavyModel
+    this.aiProvider = aiProvider
+    this.lightModel = lightModel
+    this.heavyModel = heavyModel
     this.openaiModelTemperature = parseFloat(openaiModelTemperature)
     this.openaiRetries = parseInt(openaiRetries)
     this.openaiTimeoutMS = parseInt(openaiTimeoutMS)
     this.openaiConcurrencyLimit = parseInt(openaiConcurrencyLimit)
     this.githubConcurrencyLimit = parseInt(githubConcurrencyLimit)
-    this.lightTokenLimits = new TokenLimits(openaiLightModel)
-    this.heavyTokenLimits = new TokenLimits(openaiHeavyModel)
+
+    this.lightTokenLimits = new TokenLimits(lightModel)
+    this.heavyTokenLimits = new TokenLimits(heavyModel)
     this.apiBaseUrl = apiBaseUrl
     this.language = language
   }
@@ -73,8 +77,9 @@ export class Options {
     info(`review_comment_lgtm: ${this.reviewCommentLGTM}`)
     info(`path_filters: ${this.pathFilters}`)
     info(`system_message: ${this.systemMessage}`)
-    info(`openai_light_model: ${this.openaiLightModel}`)
-    info(`openai_heavy_model: ${this.openaiHeavyModel}`)
+    info(`ai_provider: ${this.aiProvider}`)
+    info(`light_model: ${this.lightModel}`)
+    info(`heavy_model: ${this.heavyModel}`)
     info(`openai_model_temperature: ${this.openaiModelTemperature}`)
     info(`openai_retries: ${this.openaiRetries}`)
     info(`openai_timeout_ms: ${this.openaiTimeoutMS}`)
