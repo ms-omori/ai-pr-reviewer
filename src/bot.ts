@@ -26,12 +26,24 @@ export class Bot {
     this.options = options
     if (process.env.OPENAI_API_KEY) {
       const currentDate = new Date().toISOString().split('T')[0]
-      const systemMessage = `${options.systemMessage} 
+      const systemMessage = `${options.systemMessage}
 Knowledge cutoff: ${openaiOptions.tokenLimits.knowledgeCutOff}
 Current date: ${currentDate}
 
 IMPORTANT: Entire response must be in the language with ISO code: ${options.language}
 `
+
+      // Check if model is a reasoning model (o1, o3, o4-mini series)
+      const isReasoningModel = /^(o1|o3|o4-mini)/.test(openaiOptions.model)
+
+      const completionParams: any = {
+        model: openaiOptions.model
+      }
+
+      // Only add temperature for non-reasoning models
+      if (!isReasoningModel) {
+        completionParams.temperature = options.openaiModelTemperature
+      }
 
       this.api = new ChatGPTAPI({
         apiBaseUrl: options.apiBaseUrl,
@@ -41,10 +53,7 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
         debug: options.debug,
         maxModelTokens: openaiOptions.tokenLimits.maxTokens,
         maxResponseTokens: openaiOptions.tokenLimits.responseTokens,
-        completionParams: {
-          temperature: options.openaiModelTemperature,
-          model: openaiOptions.model
-        }
+        completionParams
       })
     } else {
       const err =
