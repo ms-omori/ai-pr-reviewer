@@ -58,6 +58,6 @@ export class TokenLimits {
   }
 
   string(): string {
-    return `max_tokens=${this.maxTokens}, request_tokens=${this.requestTokens}, response_tokens=${this.responseTokens}`
+    return `max_completion_tokens=${this.maxTokens}, request_tokens=${this.requestTokens}, response_tokens=${this.responseTokens}`
   }
 }
