@@ -74,17 +74,19 @@ IMPORTANT: Entire response must be in the language with ISO code: ${this.options
                         role: 'user',
                         content: message
                     });
-                    // Check if model is a reasoning model (o1, o3, o4-mini series)
-                    const isReasoningModel = /^(o1|o3|o4-mini)/.test(this.openaiOptions.model);
+                    // Check if model is a reasoning model (o1, o3, o4 series)
+                    const isReasoningModel = /^(o1|o3|o4)/.test(this.openaiOptions.model);
                     const completionParams = {
                         model: this.openaiOptions.model,
-                        messages: context.messages,
-                        // eslint-disable-next-line camelcase
-                        max_tokens: this.openaiOptions.tokenLimits.responseTokens
+                        messages: context.messages
                     };
-                    // Only add temperature for non-reasoning models
+                    // Only add temperature and max_tokens for non-reasoning models
+                    // o-series models have deprecated max_tokens parameter
                     if (!isReasoningModel) {
                         completionParams.temperature = this.options.openaiModelTemperature;
+                        // eslint-disable-next-line camelcase
+                        completionParams.max_tokens =
+                            this.openaiOptions.tokenLimits.responseTokens;
                     }
                     response = await (0, p_retry_1.default)(() => this.api.chat.completions.create(completionParams), {
                         retries: this.options.openaiRetries
