@@ -131,9 +131,10 @@ export const codeReview = async (
   }
 
   // Filter out any file that is changed compared to the incremental changes
-  const files = targetBranchFiles.filter(targetBranchFile =>
+  const files = targetBranchFiles.filter((targetBranchFile: any) =>
     incrementalFiles.some(
-      incrementalFile => incrementalFile.filename === targetBranchFile.filename
+      (incrementalFile: any) =>
+        incrementalFile.filename === targetBranchFile.filename
     )
   )
 
@@ -728,7 +729,7 @@ ${
 - Invite the bot into a review comment chain by tagging \`@coderabbitai\` in a reply.
 
 ### Code suggestions
-- The bot may make code suggestions, but please review them carefully before committing since the line number ranges may be misaligned. 
+- The bot may make code suggestions, but please review them carefully before committing since the line number ranges may be misaligned.
 - You can edit the comment made by the bot and manually tweak the suggestion if it is slightly off.
 
 ### Pausing incremental reviews
