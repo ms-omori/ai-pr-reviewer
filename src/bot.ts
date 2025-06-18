@@ -1,13 +1,7 @@
 import './fetch-polyfill'
 
 import {info, setFailed, warning} from '@actions/core'
-import {
-  ChatGPTAPI,
-  ChatGPTError,
-  ChatMessage,
-  SendMessageOptions
-  // eslint-disable-next-line import/no-unresolved
-} from 'chatgpt'
+import OpenAI from 'openai'
 import pRetry from 'p-retry'
 import {OpenAIOptions, Options} from './options'
 
@@ -35,10 +29,17 @@ interface ClaudeMessage {
   }
 }
 
+// OpenAI conversation context
+interface ConversationContext {
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]
+}
+
 export class Bot {
-  private readonly api: ChatGPTAPI | null = null // not free
+  private readonly api: OpenAI | null = null
   private readonly options: Options
   private readonly openaiOptions: OpenAIOptions
+  private readonly conversationContexts: Map<string, ConversationContext> =
+    new Map()
 
   constructor(options: Options, openaiOptions: OpenAIOptions) {
     this.options = options
@@ -46,35 +47,10 @@ export class Bot {
 
     // Initialize OpenAI API if using OpenAI provider
     if (options.aiProvider === 'openai' && process.env.OPENAI_API_KEY) {
-      const currentDate = new Date().toISOString().split('T')[0]
-      const systemMessage = `${options.systemMessage}
-Knowledge cutoff: ${openaiOptions.tokenLimits.knowledgeCutOff}
-Current date: ${currentDate}
-
-IMPORTANT: Entire response must be in the language with ISO code: ${options.language}
-`
-
-      // Check if model is a reasoning model (o1, o3, o4-mini series)
-      const isReasoningModel = /^(o1|o3|o4-mini)/.test(openaiOptions.model)
-
-      const completionParams: any = {
-        model: openaiOptions.model
-      }
-
-      // Only add temperature for non-reasoning models
-      if (!isReasoningModel) {
-        completionParams.temperature = options.openaiModelTemperature
-      }
-
-      this.api = new ChatGPTAPI({
-        apiBaseUrl: options.apiBaseUrl,
-        systemMessage,
+      this.api = new OpenAI({
         apiKey: process.env.OPENAI_API_KEY,
-        apiOrg: process.env.OPENAI_API_ORG ?? undefined,
-        debug: options.debug,
-        maxModelTokens: openaiOptions.tokenLimits.maxTokens,
-        maxResponseTokens: openaiOptions.tokenLimits.responseTokens,
-        completionParams
+        organization: process.env.OPENAI_API_ORG ?? undefined,
+        baseURL: options.apiBaseUrl || 'https://api.openai.com/v1'
       })
     } else if (
       options.aiProvider === 'claude' &&
@@ -100,8 +76,8 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
       }
       return res
     } catch (e: unknown) {
-      if (e instanceof ChatGPTError) {
-        warning(`Failed to chat: ${e}, backtrace: ${e.stack}`)
+      if (e instanceof Error) {
+        warning(`Failed to chat: ${e.message}, backtrace: ${e.stack}`)
       } else {
         warning(`Failed to chat: ${e}`)
       }
@@ -119,23 +95,77 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
       return ['', {}]
     }
 
-    let response: ChatMessage | undefined
+    let response: OpenAI.Chat.Completions.ChatCompletion | undefined
 
     if (this.api != null) {
-      const opts: SendMessageOptions = {
-        timeoutMs: this.options.openaiTimeoutMS
-      }
-      if (ids.parentMessageId) {
-        opts.parentMessageId = ids.parentMessageId
-      }
       try {
-        response = await pRetry(() => this.api!.sendMessage(message, opts), {
-          retries: this.options.openaiRetries
+        // Get or create conversation context
+        const conversationId = ids.conversationId || 'default'
+        let context = this.conversationContexts.get(conversationId)
+
+        if (!context) {
+          const currentDate = new Date().toISOString().split('T')[0]
+          const systemMessage = `${this.options.systemMessage}
+Knowledge cutoff: ${this.openaiOptions.tokenLimits.knowledgeCutOff}
+Current date: ${currentDate}
+
+IMPORTANT: Entire response must be in the language with ISO code: ${this.options.language}`
+
+          context = {
+            messages: [
+              {
+                role: 'system',
+                content: systemMessage
+              }
+            ]
+          }
+          this.conversationContexts.set(conversationId, context)
+        }
+
+        // Add user message to context
+        context.messages.push({
+          role: 'user',
+          content: message
         })
+
+        // Check if model is a reasoning model (o1, o3, o4-mini series)
+        const isReasoningModel = /^(o1|o3|o4-mini)/.test(
+          this.openaiOptions.model
+        )
+
+        const completionParams: OpenAI.Chat.Completions.ChatCompletionCreateParams =
+          {
+            model: this.openaiOptions.model,
+            messages: context.messages,
+            // eslint-disable-next-line camelcase
+            max_tokens: this.openaiOptions.tokenLimits.responseTokens
+          }
+
+        // Only add temperature for non-reasoning models
+        if (!isReasoningModel) {
+          completionParams.temperature = this.options.openaiModelTemperature
+        }
+
+        response = await pRetry(
+          () => this.api!.chat.completions.create(completionParams),
+          {
+            retries: this.options.openaiRetries
+          }
+        )
+
+        // Add assistant response to context
+        const assistantMessage = response.choices[0]?.message
+        if (assistantMessage) {
+          context.messages.push(assistantMessage)
+        }
       } catch (e: unknown) {
-        if (e instanceof ChatGPTError) {
+        if (e instanceof Error) {
           info(
-            `response: ${response}, failed to send message to openai: ${e}, backtrace: ${e.stack}`
+            `response: ${JSON.stringify(
+              response
+            )}, failed to send message to openai: ${e.message}, backtrace: ${
+              e.stack
+            }`
           )
         }
       }
@@ -150,11 +180,12 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
       setFailed('The OpenAI API is not initialized')
     }
     let responseText = ''
-    if (response != null) {
-      responseText = response.text
+    if (response?.choices?.[0]?.message?.content) {
+      responseText = response.choices[0].message.content
     } else {
       warning('openai response is null')
     }
+
     // remove the prefix "with " in the response
     if (responseText.startsWith('with ')) {
       responseText = responseText.substring(5)
@@ -162,9 +193,10 @@ IMPORTANT: Entire response must be in the language with ISO code: ${options.lang
     if (this.options.debug) {
       info(`openai responses: ${responseText}`)
     }
+
     const newIds: Ids = {
       parentMessageId: response?.id,
-      conversationId: response?.conversationId
+      conversationId: ids.conversationId || 'default'
     }
     return [responseText, newIds]
   }
