@@ -127,7 +127,6 @@ IMPORTANT: Entire response must be in the language with ISO code: ${this.options
           }
           this.conversationContexts.set(conversationId, context)
           this.enforceContextLimit()
-          this.enforceContextLimit()
         }
 
         // Add user message to context
