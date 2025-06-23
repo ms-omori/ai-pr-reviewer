@@ -40,6 +40,7 @@ export class Bot {
   private readonly openaiOptions: OpenAIOptions
   private readonly conversationContexts: Map<string, ConversationContext> =
     new Map()
+  private readonly maxContexts: number = 100
 
   constructor(options: Options, openaiOptions: OpenAIOptions) {
     this.options = options
@@ -102,6 +103,11 @@ export class Bot {
         // Get or create conversation context
         const conversationId = ids.conversationId || 'default'
         let context = this.conversationContexts.get(conversationId)
+        
+        if (context) {
+          this.conversationContexts.delete(conversationId)
+          this.conversationContexts.set(conversationId, context)
+        }
 
         if (!context) {
           const currentDate = new Date().toISOString().split('T')[0]
@@ -120,6 +126,8 @@ IMPORTANT: Entire response must be in the language with ISO code: ${this.options
             ]
           }
           this.conversationContexts.set(conversationId, context)
+          this.enforceContextLimit()
+          this.enforceContextLimit()
         }
 
         // Add user message to context
@@ -199,6 +207,13 @@ IMPORTANT: Entire response must be in the language with ISO code: ${this.options
       conversationId: ids.conversationId || 'default'
     }
     return [responseText, newIds]
+  }
+
+  private enforceContextLimit(): void {
+    if (this.conversationContexts.size > this.maxContexts) {
+      const oldestKey = this.conversationContexts.keys().next().value
+      this.conversationContexts.delete(oldestKey)
+    }
   }
 
   private readonly chatClaude = async (
